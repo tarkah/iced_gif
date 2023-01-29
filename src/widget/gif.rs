@@ -23,9 +23,9 @@ pub enum Error {
 }
 
 pub struct Frames {
-    bytes: u64,
     first: Frame,
     frames: Vec<Frame>,
+    total_bytes: u64,
 }
 
 impl fmt::Debug for Frames {
@@ -38,7 +38,7 @@ impl Frames {
     pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
         let decoder = gif::GifDecoder::new(reader)?;
 
-        let bytes = decoder.total_bytes();
+        let total_bytes = decoder.total_bytes();
 
         let frames = decoder
             .into_frames()
@@ -49,7 +49,7 @@ impl Frames {
         let first = frames.first().cloned().unwrap();
 
         Ok(Frames {
-            bytes,
+            total_bytes,
             first,
             frames,
         })
@@ -89,11 +89,10 @@ impl From<::image::Frame> for Frame {
     }
 }
 
-#[derive(Default)]
 struct State {
-    bytes: u64,
     index: usize,
-    current: Option<Current>,
+    current: Current,
+    total_bytes: u64,
 }
 
 struct Current {
@@ -170,18 +169,26 @@ where
 
     fn state(&self) -> tree::State {
         tree::State::new(State {
-            bytes: self.frames.bytes,
             index: 0,
-            current: Some(self.frames.first.clone().into()),
+            current: self.frames.first.clone().into(),
+            total_bytes: self.frames.total_bytes,
         })
     }
 
     fn diff(&self, tree: &mut Tree) {
         let state = tree.state.downcast_mut::<State>();
 
-        if state.current.is_none() || state.bytes != self.frames.bytes {
-            state.index = 0;
-            state.current = Some(self.frames.first.clone().into());
+        // Reset state if new gif Frames is used w/
+        // same state tree.
+        //
+        // Total bytes of the gif should be a good enough
+        // proxy for it changing.
+        if state.total_bytes != self.frames.total_bytes {
+            *state = State {
+                index: 0,
+                current: self.frames.first.clone().into(),
+                total_bytes: self.frames.total_bytes,
+            };
         }
     }
 
@@ -208,21 +215,19 @@ where
     ) -> event::Status {
         let state = tree.state.downcast_mut::<State>();
 
-        if let Some(current) = state.current.as_mut() {
-            if let Event::Window(window::Event::RedrawRequested(now)) = event {
-                let elapsed = now.duration_since(current.started);
+        if let Event::Window(window::Event::RedrawRequested(now)) = event {
+            let elapsed = now.duration_since(state.current.started);
 
-                if elapsed > current.frame.delay {
-                    state.index = (state.index + 1) % self.frames.frames.len();
+            if elapsed > state.current.frame.delay {
+                state.index = (state.index + 1) % self.frames.frames.len();
 
-                    *current = self.frames.frames[state.index].clone().into();
+                state.current = self.frames.frames[state.index].clone().into();
 
-                    shell.request_redraw(window::RedrawRequest::At(now + current.frame.delay));
-                } else {
-                    let remaining = current.frame.delay - elapsed;
+                shell.request_redraw(window::RedrawRequest::At(now + state.current.frame.delay));
+            } else {
+                let remaining = state.current.frame.delay - elapsed;
 
-                    shell.request_redraw(window::RedrawRequest::At(now + remaining));
-                }
+                shell.request_redraw(window::RedrawRequest::At(now + remaining));
             }
         }
 
@@ -241,37 +246,35 @@ where
     ) {
         let state = tree.state.downcast_ref::<State>();
 
-        if let Some(handle) = state.current.as_ref().map(|current| &current.frame.handle) {
-            // Pulled from iced_native::widget::<Image as Widget>::draw
-            //
-            // TODO: export iced_native::widget::image::draw as standalone function
-            {
-                let Size { width, height } = renderer.dimensions(handle);
-                let image_size = Size::new(width as f32, height as f32);
+        // Pulled from iced_native::widget::<Image as Widget>::draw
+        //
+        // TODO: export iced_native::widget::image::draw as standalone function
+        {
+            let Size { width, height } = renderer.dimensions(&state.current.frame.handle);
+            let image_size = Size::new(width as f32, height as f32);
 
-                let bounds = layout.bounds();
-                let adjusted_fit = self.content_fit.fit(image_size, bounds.size());
+            let bounds = layout.bounds();
+            let adjusted_fit = self.content_fit.fit(image_size, bounds.size());
 
-                let render = |renderer: &mut Renderer| {
-                    let offset = Vector::new(
-                        (bounds.width - adjusted_fit.width).max(0.0) / 2.0,
-                        (bounds.height - adjusted_fit.height).max(0.0) / 2.0,
-                    );
+            let render = |renderer: &mut Renderer| {
+                let offset = Vector::new(
+                    (bounds.width - adjusted_fit.width).max(0.0) / 2.0,
+                    (bounds.height - adjusted_fit.height).max(0.0) / 2.0,
+                );
 
-                    let drawing_bounds = Rectangle {
-                        width: adjusted_fit.width,
-                        height: adjusted_fit.height,
-                        ..bounds
-                    };
-
-                    renderer.draw(handle.clone(), drawing_bounds + offset)
+                let drawing_bounds = Rectangle {
+                    width: adjusted_fit.width,
+                    height: adjusted_fit.height,
+                    ..bounds
                 };
 
-                if adjusted_fit.width > bounds.width || adjusted_fit.height > bounds.height {
-                    renderer.with_layer(bounds, render);
-                } else {
-                    render(renderer)
-                }
+                renderer.draw(state.current.frame.handle.clone(), drawing_bounds + offset)
+            };
+
+            if adjusted_fit.width > bounds.width || adjusted_fit.height > bounds.height {
+                renderer.with_layer(bounds, render);
+            } else {
+                render(renderer)
             }
         }
     }
