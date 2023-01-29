@@ -21,7 +21,7 @@ fn main() {
 
 #[derive(Debug)]
 enum Message {
-    Loaded(Option<gif::Frames>),
+    Loaded(Result<gif::Frames, gif::Error>),
 }
 
 #[derive(Default)]
@@ -55,7 +55,7 @@ impl Application for App {
     fn update(&mut self, message: Message) -> Command<Message> {
         let Message::Loaded(frames) = message;
 
-        self.frames = frames;
+        self.frames = frames.ok();
 
         Command::none()
     }

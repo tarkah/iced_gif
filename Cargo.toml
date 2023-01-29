@@ -18,3 +18,4 @@ iced_native = "0.8"
 iced_futures = "0.5"
 
 image = { version = "0.24", features = ["gif"] }
+thiserror = "1.0"

@@ -18,6 +18,14 @@ pub fn gif(frames: &Frames) -> Gif {
     Gif::new(frames)
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Image(#[from] ::image::ImageError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
 pub struct Frames {
     bytes: u64,
     first: Frame,
@@ -31,8 +39,8 @@ impl fmt::Debug for Frames {
 }
 
 impl Frames {
-    pub fn from_reader<R: Read>(reader: R) -> Option<Self> {
-        let decoder = gif::GifDecoder::new(reader).unwrap();
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
+        let decoder = gif::GifDecoder::new(reader)?;
 
         let bytes = decoder.total_bytes();
 
@@ -40,12 +48,11 @@ impl Frames {
             .into_frames()
             .into_iter()
             .map(|result| result.map(Frame::from))
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+            .collect::<Result<Vec<_>, _>>()?;
 
         let first = frames.first().cloned().unwrap();
 
-        Some(Frames {
+        Ok(Frames {
             bytes,
             first,
             frames,
@@ -54,12 +61,12 @@ impl Frames {
 
     pub fn load_from_path<Message>(
         path: impl AsRef<Path>,
-        on_load: impl FnOnce(Option<Frames>) -> Message + 'static + MaybeSend,
+        on_load: impl FnOnce(Result<Frames, Error>) -> Message + 'static + MaybeSend,
     ) -> Command<Message> {
         let path = path.as_ref().to_path_buf();
 
         let f = async move {
-            let reader = BufReader::new(File::open(path).unwrap());
+            let reader = BufReader::new(File::open(path)?);
 
             Self::from_reader(reader)
         };
