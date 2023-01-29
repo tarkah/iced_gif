@@ -1,3 +1,4 @@
+//! Display a GIF in your user interface
 use std::fmt;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -14,14 +15,18 @@ use iced_native::{
 use image_rs::codecs::gif;
 use image_rs::{AnimationDecoder, ImageDecoder};
 
+/// Error loading or decoding a gif
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Decode error
     #[error(transparent)]
     Image(#[from] image_rs::ImageError),
+    /// Load error
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
 
+/// The frames of a decoded gif
 pub struct Frames {
     first: Frame,
     frames: Vec<Frame>,
@@ -35,6 +40,7 @@ impl fmt::Debug for Frames {
 }
 
 impl Frames {
+    /// Decode [`Frames`] from the supplied reader
     pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
         let decoder = gif::GifDecoder::new(reader)?;
 
@@ -55,6 +61,7 @@ impl Frames {
         })
     }
 
+    /// Load [`Frames`] from the supplied path
     pub fn load_from_path<Message>(
         path: impl AsRef<Path>,
         on_load: impl FnOnce(Result<Frames, Error>) -> Message + 'static + MaybeSend,
@@ -109,6 +116,7 @@ impl From<Frame> for Current {
     }
 }
 
+/// A frame that displays a GIF while keeping aspect ratio
 #[derive(Debug)]
 pub struct Gif<'a> {
     frames: &'a Frames,
