@@ -5,5 +5,5 @@ edition = "2021"
 authors = ["tarkah <admin@tarkah.dev>"]
 
 [dependencies]
-iced_gif = { path = "../" }
-iced = { version = "0.7", features = [ "image" ] }
+iced_gif = { path = "../", features = ["tokio"]}
+iced = { version = "0.7", features = [ "image", "tokio" ] }
