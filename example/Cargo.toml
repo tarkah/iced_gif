@@ -1,0 +1,9 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2021"
+authors = ["tarkah <admin@tarkah.dev>"]
+
+[dependencies]
+iced_gif = { path = "../" }
+iced = { version = "0.7", features = [ "image" ] }
