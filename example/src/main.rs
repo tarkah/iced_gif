@@ -36,7 +36,7 @@ impl Application for App {
     type Flags = ();
 
     fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/rust-lang-ferris.gif");
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/rust-lang-ferris.gif");
 
         (
             App::default(),
