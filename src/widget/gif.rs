@@ -14,10 +14,6 @@ use iced_native::{
     Length, Point, Rectangle, Shell, Size, Vector, Widget,
 };
 
-pub fn gif(frames: &Frames) -> Gif {
-    Gif::new(frames)
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
