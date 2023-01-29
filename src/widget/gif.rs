@@ -4,8 +4,6 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use ::image::codecs::gif;
-use ::image::{AnimationDecoder, ImageDecoder};
 use iced_futures::MaybeSend;
 use iced_native::image::{self, Handle};
 use iced_native::widget::{tree, Tree};
@@ -13,11 +11,13 @@ use iced_native::{
     event, layout, renderer, window, Clipboard, Command, ContentFit, Element, Event, Layout,
     Length, Point, Rectangle, Shell, Size, Vector, Widget,
 };
+use image_rs::codecs::gif;
+use image_rs::{AnimationDecoder, ImageDecoder};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Image(#[from] ::image::ImageError),
+    Image(#[from] image_rs::ImageError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -77,8 +77,8 @@ struct Frame {
     handle: image::Handle,
 }
 
-impl From<::image::Frame> for Frame {
-    fn from(frame: ::image::Frame) -> Self {
+impl From<image_rs::Frame> for Frame {
+    fn from(frame: image_rs::Frame) -> Self {
         let (width, height) = frame.buffer().dimensions();
 
         let delay = frame.delay().into();
