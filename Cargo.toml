@@ -17,13 +17,17 @@ members = [
 ]
 
 [features]
-default = []
+default = ["async-fs"]
 tokio = ["dep:tokio"]
 
 [dependencies]
 iced_native = "0.8"
 iced_futures = "0.5"
 thiserror = "1.0"
+
+[dependencies.async-fs]
+version = "1.6"
+optional = true
 
 [dependencies.tokio]
 version = "1"

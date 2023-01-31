@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 authors = ["tarkah <admin@tarkah.dev>"]
 
+[features]
+default = ["iced_gif/default"]
+tokio = ["iced_gif/tokio", "iced/tokio"]
+
 [dependencies]
-iced_gif = { path = "../", features = ["tokio"]}
-iced = { version = "0.7", features = [ "image", "tokio" ] }
+iced_gif = { path = "../", default-features = false }
+iced = { version = "0.7", features = [ "image" ] }

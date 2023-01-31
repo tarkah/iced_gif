@@ -42,8 +42,30 @@ impl fmt::Debug for Frames {
     }
 }
 
-#[cfg(feature = "tokio")]
 impl Frames {
+    /// Load [`Frames`] from the supplied path
+    pub fn load_from_path(path: impl AsRef<Path>) -> Command<Result<Frames, Error>> {
+        #[cfg(feature = "tokio")]
+        use tokio::fs::File;
+        #[cfg(feature = "tokio")]
+        use tokio::io::BufReader;
+
+        #[cfg(not(feature = "tokio"))]
+        use async_fs::File;
+        #[cfg(not(feature = "tokio"))]
+        use iced_futures::futures::io::BufReader;
+
+        let path = path.as_ref().to_path_buf();
+
+        let f = async move {
+            let reader = BufReader::new(File::open(path).await?);
+
+            Self::from_reader(reader).await
+        };
+
+        Command::perform(f, std::convert::identity)
+    }
+
     /// Decode [`Frames`] from the supplied async reader
     pub async fn from_reader<R: AsyncRead>(reader: R) -> Result<Self, Error> {
         use iced_futures::futures::pin_mut;
@@ -57,38 +79,8 @@ impl Frames {
         Self::from_bytes(bytes)
     }
 
-    /// Load [`Frames`] from the supplied path
-    pub fn load_from_path(path: impl AsRef<Path>) -> Command<Result<Frames, Error>> {
-        use tokio::fs::File;
-        use tokio::io::BufReader;
-
-        let path = path.as_ref().to_path_buf();
-
-        let f = async move {
-            let reader = BufReader::new(File::open(path).await?);
-
-            Self::from_reader(reader).await
-        };
-
-        Command::perform(f, std::convert::identity)
-    }
-}
-
-#[cfg(not(feature = "tokio"))]
-impl Frames {
-    /// Decode [`Frames`] from the supplied async reader
-    pub async fn from_reader<R: AsyncRead>(reader: R) -> Result<Self, Error> {
-        todo!();
-    }
-
-    /// Load [`Frames`] from the supplied path
-    pub fn load_from_path(path: impl AsRef<Path>) -> Command<Result<Frames, Error>> {
-        todo!();
-    }
-}
-
-impl Frames {
-    fn from_bytes(bytes: Vec<u8>) -> Result<Self, Error> {
+    /// Decode [`Frames`] from the supplied bytes
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, Error> {
         let decoder = gif::GifDecoder::new(Cursor::new(bytes))?;
 
         let total_bytes = decoder.total_bytes();
