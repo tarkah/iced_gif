@@ -16,10 +16,26 @@ members = [
   "./example",
 ]
 
+[features]
+default = []
+tokio = ["dep:tokio", "dep:tokio-util", "iced_futures/tokio"]
+
 [dependencies]
 iced_native = "0.8"
-iced_futures = "0.5"
 thiserror = "1.0"
+
+[dependencies.iced_futures]
+version = "0.5"
+
+[dependencies.tokio]
+version = "1"
+optional = true
+features = ["fs"]
+
+[dependencies.tokio-util]
+version = "0.7"
+optional = true
+features = ["io", "io-util"]
 
 [dependencies.image_rs]
 package = "image"

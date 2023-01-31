@@ -1,7 +1,7 @@
 //! Display a GIF in your user interface
 use std::fmt;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{Read, BufReader};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -14,6 +14,10 @@ use iced_native::{
 };
 use image_rs::codecs::gif;
 use image_rs::{AnimationDecoder, ImageDecoder};
+
+#[cfg(feature = "tokio")]
+use tokio::{io::{BufReader as TokioBufReader, AsyncRead}, fs::File as TokioFile};
+
 
 /// Error loading or decoding a gif
 #[derive(Debug, thiserror::Error)]
@@ -36,6 +40,33 @@ pub struct Frames {
 impl fmt::Debug for Frames {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Frames").finish()
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl Frames {
+    /// Decode [`Frames`] from the supplied async reader
+    pub fn from_async_reader<R: AsyncRead>(reader: R) -> Result<Self, Error> {
+        use iced_futures::futures::pin_mut;
+        use tokio_util::io::SyncIoBridge;
+
+        pin_mut!(reader);
+        Self::from_reader(SyncIoBridge::new(reader))
+    }
+
+    /// Load [`Frames`] from the supplied path
+    pub fn load_from_path_async(
+        path: impl AsRef<Path>,
+    ) -> Command<Result<Frames, Error>> {
+        let path = path.as_ref().to_path_buf();
+
+        let f = async move {
+            let reader = TokioBufReader::new(TokioFile::open(path).await?);
+
+            Self::from_async_reader(reader)
+        };
+
+        Command::perform(f, |result| result)
     }
 }
 
