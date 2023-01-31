@@ -1,11 +1,9 @@
 //! Display a GIF in your user interface
 use std::fmt;
-use std::fs::File;
-use std::io::{Read, BufReader};
+use std::io::Cursor;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use iced_futures::MaybeSend;
 use iced_native::image::{self, Handle};
 use iced_native::widget::{tree, Tree};
 use iced_native::{
@@ -15,9 +13,10 @@ use iced_native::{
 use image_rs::codecs::gif;
 use image_rs::{AnimationDecoder, ImageDecoder};
 
+#[cfg(not(feature = "tokio"))]
+use iced_futures::futures::{AsyncRead, AsyncReadExt};
 #[cfg(feature = "tokio")]
-use tokio::{io::{BufReader as TokioBufReader, AsyncRead}, fs::File as TokioFile};
-
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 /// Error loading or decoding a gif
 #[derive(Debug, thiserror::Error)]
@@ -46,34 +45,51 @@ impl fmt::Debug for Frames {
 #[cfg(feature = "tokio")]
 impl Frames {
     /// Decode [`Frames`] from the supplied async reader
-    pub fn from_async_reader<R: AsyncRead>(reader: R) -> Result<Self, Error> {
+    pub async fn from_reader<R: AsyncRead>(reader: R) -> Result<Self, Error> {
         use iced_futures::futures::pin_mut;
-        use tokio_util::io::SyncIoBridge;
 
         pin_mut!(reader);
-        Self::from_reader(SyncIoBridge::new(reader))
+
+        let mut bytes = vec![];
+
+        reader.read_to_end(&mut bytes).await?;
+
+        Self::from_bytes(bytes)
     }
 
     /// Load [`Frames`] from the supplied path
-    pub fn load_from_path_async(
-        path: impl AsRef<Path>,
-    ) -> Command<Result<Frames, Error>> {
+    pub fn load_from_path(path: impl AsRef<Path>) -> Command<Result<Frames, Error>> {
+        use tokio::fs::File;
+        use tokio::io::BufReader;
+
         let path = path.as_ref().to_path_buf();
 
         let f = async move {
-            let reader = TokioBufReader::new(TokioFile::open(path).await?);
+            let reader = BufReader::new(File::open(path).await?);
 
-            Self::from_async_reader(reader)
+            Self::from_reader(reader).await
         };
 
-        Command::perform(f, |result| result)
+        Command::perform(f, std::convert::identity)
+    }
+}
+
+#[cfg(not(feature = "tokio"))]
+impl Frames {
+    /// Decode [`Frames`] from the supplied async reader
+    pub async fn from_reader<R: AsyncRead>(reader: R) -> Result<Self, Error> {
+        todo!();
+    }
+
+    /// Load [`Frames`] from the supplied path
+    pub fn load_from_path(path: impl AsRef<Path>) -> Command<Result<Frames, Error>> {
+        todo!();
     }
 }
 
 impl Frames {
-    /// Decode [`Frames`] from the supplied reader
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self, Error> {
-        let decoder = gif::GifDecoder::new(reader)?;
+    fn from_bytes(bytes: Vec<u8>) -> Result<Self, Error> {
+        let decoder = gif::GifDecoder::new(Cursor::new(bytes))?;
 
         let total_bytes = decoder.total_bytes();
 
@@ -90,22 +106,6 @@ impl Frames {
             first,
             frames,
         })
-    }
-
-    /// Load [`Frames`] from the supplied path
-    pub fn load_from_path<Message>(
-        path: impl AsRef<Path>,
-        on_load: impl FnOnce(Result<Frames, Error>) -> Message + 'static + MaybeSend,
-    ) -> Command<Message> {
-        let path = path.as_ref().to_path_buf();
-
-        let f = async move {
-            let reader = BufReader::new(File::open(path)?);
-
-            Self::from_reader(reader)
-        };
-
-        Command::perform(f, on_load)
     }
 }
 
