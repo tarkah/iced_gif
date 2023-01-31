@@ -40,7 +40,7 @@ impl Application for App {
 
         (
             App::default(),
-            gif::Frames::load_from_path(path, Message::Loaded),
+            gif::Frames::load_from_path(path).map(Message::Loaded),
         )
     }
 
