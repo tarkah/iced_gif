@@ -1,6 +1,6 @@
 [package]
 name = "iced_gif"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["tarkah <admin@tarkah.dev>"]
 description = "A GIF widget for Iced"
@@ -21,7 +21,7 @@ default = ["async-fs"]
 tokio = ["dep:tokio"]
 
 [dependencies]
-iced_native = "0.9"
+iced_native = "0.10.1"
 iced_futures = "0.6"
 thiserror = "1.0"
 
