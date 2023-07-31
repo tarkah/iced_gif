@@ -1,15 +1,17 @@
 //! Display a GIF in your user interface
 use std::fmt;
-use std::io::Cursor;
+use std::io;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use iced_native::image::{self, Handle};
-use iced_native::widget::{tree, Tree};
-use iced_native::{
-    event, layout, renderer, window, Clipboard, Command, ContentFit, Element, Event, Layout,
-    Length, Point, Rectangle, Shell, Size, Vector, Widget,
+use iced_widget::core::image::{self, Handle};
+use iced_widget::core::mouse::Cursor;
+use iced_widget::core::widget::{tree, Tree};
+use iced_widget::core::{
+    event, layout, renderer, window, Clipboard, ContentFit, Element, Event, Layout, Length,
+    Rectangle, Shell, Size, Vector, Widget,
 };
+use iced_widget::runtime::Command;
 use image_rs::codecs::gif;
 use image_rs::{AnimationDecoder, ImageDecoder};
 
@@ -81,7 +83,7 @@ impl Frames {
 
     /// Decode [`Frames`] from the supplied bytes
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, Error> {
-        let decoder = gif::GifDecoder::new(Cursor::new(bytes))?;
+        let decoder = gif::GifDecoder::new(io::Cursor::new(bytes))?;
 
         let total_bytes = decoder.total_bytes();
 
@@ -224,7 +226,7 @@ where
     }
 
     fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
-        iced_native::widget::image::layout(
+        iced_widget::image::layout(
             renderer,
             limits,
             &self.frames.first.handle,
@@ -239,10 +241,11 @@ where
         tree: &mut Tree,
         event: Event,
         _layout: Layout<'_>,
-        _cursor_position: Point,
+        _cursor: Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
+        _viewport: &Rectangle,
     ) -> event::Status {
         let state = tree.state.downcast_mut::<State>();
 
@@ -272,7 +275,7 @@ where
         _theme: &Renderer::Theme,
         _style: &renderer::Style,
         layout: Layout<'_>,
-        _cursor_position: Point,
+        _cursor: Cursor,
         _viewport: &Rectangle,
     ) {
         let state = tree.state.downcast_ref::<State>();

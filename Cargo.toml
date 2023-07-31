@@ -21,8 +21,8 @@ default = ["async-fs"]
 tokio = ["dep:tokio"]
 
 [dependencies]
-iced_native = "0.10.1"
-iced_futures = "0.6"
+iced_widget = { version = "0.1",  features = ["image"] }
+iced_futures = "0.7"
 thiserror = "1.0"
 
 [dependencies.async-fs]
