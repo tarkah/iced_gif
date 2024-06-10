@@ -184,16 +184,13 @@ impl<'a> Gif<'a> {
     }
 }
 
-impl<'a, Message, Renderer> Widget<Message, Renderer> for Gif<'a>
+impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Gif<'a>
 where
     Renderer: image::Renderer<Handle = Handle>,
 {
-    fn width(&self) -> Length {
-        self.width
-    }
 
-    fn height(&self) -> Length {
-        self.height
+    fn size(&self) -> iced_widget::core::Size<Length> {
+        iced_widget::core::Size{width: self.width, height: self.height}
     }
 
     fn tag(&self) -> tree::Tag {
@@ -225,7 +222,7 @@ where
         }
     }
 
-    fn layout(&self, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+    fn layout(&self, _t: &mut iced_widget::core::widget::Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         iced_widget::image::layout(
             renderer,
             limits,
@@ -249,7 +246,7 @@ where
     ) -> event::Status {
         let state = tree.state.downcast_mut::<State>();
 
-        if let Event::Window(window::Event::RedrawRequested(now)) = event {
+        if let Event::Window(_, window::Event::RedrawRequested(now)) = event {
             let elapsed = now.duration_since(state.current.started);
 
             if elapsed > state.current.frame.delay {
@@ -272,7 +269,7 @@ where
         &self,
         tree: &Tree,
         renderer: &mut Renderer,
-        _theme: &Renderer::Theme,
+        _theme: &Theme,
         _style: &renderer::Style,
         layout: Layout<'_>,
         _cursor: Cursor,
@@ -302,7 +299,7 @@ where
                     ..bounds
                 };
 
-                renderer.draw(state.current.frame.handle.clone(), drawing_bounds + offset)
+                renderer.draw(state.current.frame.handle.clone(), image::FilterMethod::Linear, drawing_bounds + offset)
             };
 
             if adjusted_fit.width > bounds.width || adjusted_fit.height > bounds.height {
@@ -314,11 +311,11 @@ where
     }
 }
 
-impl<'a, Message, Renderer> From<Gif<'a>> for Element<'a, Message, Renderer>
+impl<'a, Message, Theme, Renderer> From<Gif<'a>> for Element<'a, Message, Theme, Renderer>
 where
     Renderer: image::Renderer<Handle = Handle> + 'a,
 {
-    fn from(gif: Gif<'a>) -> Element<'a, Message, Renderer> {
+    fn from(gif: Gif<'a>) -> Element<'a, Message, Theme, Renderer> {
         Element::new(gif)
     }
 }
