@@ -188,9 +188,8 @@ impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Gif<'a>
 where
     Renderer: image::Renderer<Handle = Handle>,
 {
-
-    fn size(&self) -> iced_widget::core::Size<Length> {
-        iced_widget::core::Size{width: self.width, height: self.height}
+    fn size(&self) -> Size<Length> {
+        Size::new(self.width, self.height)
     }
 
     fn tag(&self) -> tree::Tag {
@@ -222,7 +221,12 @@ where
         }
     }
 
-    fn layout(&self, _t: &mut iced_widget::core::widget::Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+    fn layout(
+        &self,
+        _tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
         iced_widget::image::layout(
             renderer,
             limits,
@@ -299,7 +303,11 @@ where
                     ..bounds
                 };
 
-                renderer.draw(state.current.frame.handle.clone(), image::FilterMethod::Linear, drawing_bounds + offset)
+                renderer.draw(
+                    state.current.frame.handle.clone(),
+                    image::FilterMethod::Linear,
+                    drawing_bounds + offset,
+                )
             };
 
             if adjusted_fit.width > bounds.width || adjusted_fit.height > bounds.height {
