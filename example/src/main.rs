@@ -3,14 +3,14 @@ use std::path::PathBuf;
 use iced::widget::{container, row};
 use iced::{
     application, color, executor, theme, window, Application, Command, Element, Length, Settings,
-    Theme,
+    Size, Theme,
 };
 use iced_gif::widget::gif;
 
 fn main() {
     let settings = Settings {
         window: window::Settings {
-            size: (498, 164),
+            size: Size::new(498.0, 164.0),
             ..Default::default()
         },
         ..Default::default()
