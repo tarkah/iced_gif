@@ -4,14 +4,16 @@ use std::io;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use iced_widget::core::image::{self, Handle};
+#[allow(unused)]
+use iced_widget::core::image::Image;
+use iced_widget::core::image::{self, FilterMethod, Handle};
 use iced_widget::core::mouse::Cursor;
 use iced_widget::core::widget::{tree, Tree};
 use iced_widget::core::{
-    event, layout, renderer, window, Clipboard, ContentFit, Element, Event, Layout, Length,
-    Rectangle, Shell, Size, Vector, Widget,
+    event, layout, renderer, window, Clipboard, ContentFit, Element, Event, Layout, Length, Point,
+    Rectangle, Rotation, Shell, Size, Vector, Widget,
 };
-use iced_widget::runtime::Command;
+use iced_widget::runtime::Task;
 use image_rs::codecs::gif;
 use image_rs::{AnimationDecoder, ImageDecoder};
 
@@ -46,7 +48,7 @@ impl fmt::Debug for Frames {
 
 impl Frames {
     /// Load [`Frames`] from the supplied path
-    pub fn load_from_path(path: impl AsRef<Path>) -> Command<Result<Frames, Error>> {
+    pub fn load_from_path(path: impl AsRef<Path>) -> Task<Result<Frames, Error>> {
         #[cfg(feature = "tokio")]
         use tokio::fs::File;
         #[cfg(feature = "tokio")]
@@ -65,7 +67,7 @@ impl Frames {
             Self::from_reader(reader).await
         };
 
-        Command::perform(f, std::convert::identity)
+        Task::perform(f, std::convert::identity)
     }
 
     /// Decode [`Frames`] from the supplied async reader
@@ -115,7 +117,7 @@ impl From<image_rs::Frame> for Frame {
 
         let delay = frame.delay().into();
 
-        let handle = image::Handle::from_pixels(width, height, frame.into_buffer().into_vec());
+        let handle = image::Handle::from_rgba(width, height, frame.into_buffer().into_vec());
 
         Self { delay, handle }
     }
@@ -148,6 +150,9 @@ pub struct Gif<'a> {
     width: Length,
     height: Length,
     content_fit: ContentFit,
+    filter_method: FilterMethod,
+    rotation: Rotation,
+    opacity: f32,
 }
 
 impl<'a> Gif<'a> {
@@ -157,7 +162,10 @@ impl<'a> Gif<'a> {
             frames,
             width: Length::Shrink,
             height: Length::Shrink,
-            content_fit: ContentFit::Contain,
+            content_fit: ContentFit::default(),
+            filter_method: FilterMethod::default(),
+            rotation: Rotation::default(),
+            opacity: 1.0,
         }
     }
 
@@ -173,14 +181,33 @@ impl<'a> Gif<'a> {
         self
     }
 
-    /// Sets the [`ContentFit`] of the [`Gif`].
+    /// Sets the [`ContentFit`] of the [`Image`].
     ///
     /// Defaults to [`ContentFit::Contain`]
-    pub fn content_fit(self, content_fit: ContentFit) -> Self {
-        Self {
-            content_fit,
-            ..self
-        }
+    pub fn content_fit(mut self, content_fit: ContentFit) -> Self {
+        self.content_fit = content_fit;
+        self
+    }
+
+    /// Sets the [`FilterMethod`] of the [`Image`].
+    pub fn filter_method(mut self, filter_method: FilterMethod) -> Self {
+        self.filter_method = filter_method;
+        self
+    }
+
+    /// Applies the given [`Rotation`] to the [`Image`].
+    pub fn rotation(mut self, rotation: impl Into<Rotation>) -> Self {
+        self.rotation = rotation.into();
+        self
+    }
+
+    /// Sets the opacity of the [`Image`].
+    ///
+    /// It should be in the [0.0, 1.0] range—`0.0` meaning completely transparent,
+    /// and `1.0` meaning completely opaque.
+    pub fn opacity(mut self, opacity: impl Into<f32>) -> Self {
+        self.opacity = opacity.into();
+        self
     }
 }
 
@@ -234,6 +261,7 @@ where
             self.width,
             self.height,
             self.content_fit,
+            self.rotation,
         )
     }
 
@@ -250,7 +278,7 @@ where
     ) -> event::Status {
         let state = tree.state.downcast_mut::<State>();
 
-        if let Event::Window(_, window::Event::RedrawRequested(now)) = event {
+        if let Event::Window(window::Event::RedrawRequested(now)) = event {
             let elapsed = now.duration_since(state.current.started);
 
             if elapsed > state.current.frame.delay {
@@ -285,35 +313,50 @@ where
         //
         // TODO: export iced_native::widget::image::draw as standalone function
         {
-            let Size { width, height } = renderer.dimensions(&state.current.frame.handle);
+            let Size { width, height } = renderer.measure_image(&state.current.frame.handle);
             let image_size = Size::new(width as f32, height as f32);
+            let rotated_size = self.rotation.apply(image_size);
 
             let bounds = layout.bounds();
-            let adjusted_fit = self.content_fit.fit(image_size, bounds.size());
+            let adjusted_fit = self.content_fit.fit(rotated_size, bounds.size());
+
+            let scale = Vector::new(
+                adjusted_fit.width / rotated_size.width,
+                adjusted_fit.height / rotated_size.height,
+            );
+
+            let final_size = image_size * scale;
+
+            let position = match self.content_fit {
+                ContentFit::None => Point::new(
+                    bounds.x + (rotated_size.width - adjusted_fit.width) / 2.0,
+                    bounds.y + (rotated_size.height - adjusted_fit.height) / 2.0,
+                ),
+                _ => Point::new(
+                    bounds.center_x() - final_size.width / 2.0,
+                    bounds.center_y() - final_size.height / 2.0,
+                ),
+            };
+
+            let drawing_bounds = Rectangle::new(position, final_size);
 
             let render = |renderer: &mut Renderer| {
-                let offset = Vector::new(
-                    (bounds.width - adjusted_fit.width).max(0.0) / 2.0,
-                    (bounds.height - adjusted_fit.height).max(0.0) / 2.0,
+                renderer.draw_image(
+                    image::Image {
+                        handle: state.current.frame.handle.clone(),
+                        filter_method: self.filter_method,
+                        rotation: self.rotation.radians(),
+                        opacity: self.opacity,
+                        snap: true,
+                    },
+                    drawing_bounds,
                 );
-
-                let drawing_bounds = Rectangle {
-                    width: adjusted_fit.width,
-                    height: adjusted_fit.height,
-                    ..bounds
-                };
-
-                renderer.draw(
-                    state.current.frame.handle.clone(),
-                    image::FilterMethod::Linear,
-                    drawing_bounds + offset,
-                )
             };
 
             if adjusted_fit.width > bounds.width || adjusted_fit.height > bounds.height {
                 renderer.with_layer(bounds, render);
             } else {
-                render(renderer)
+                render(renderer);
             }
         }
     }

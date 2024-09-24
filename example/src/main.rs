@@ -1,22 +1,17 @@
 use std::path::PathBuf;
 
 use iced::widget::{container, row};
-use iced::{
-    application, color, executor, theme, window, Application, Command, Element, Length, Settings,
-    Size, Theme,
-};
+use iced::{window, Element, Length, Size, Task};
 use iced_gif::widget::gif;
 
 fn main() {
-    let settings = Settings {
-        window: window::Settings {
+    iced::application(App::title, App::update, App::view)
+        .window(window::Settings {
             size: Size::new(498.0, 164.0),
             ..Default::default()
-        },
-        ..Default::default()
-    };
-
-    App::run(settings).unwrap()
+        })
+        .run_with(App::new)
+        .unwrap()
 }
 
 #[derive(Debug)]
@@ -29,13 +24,8 @@ struct App {
     frames: Option<gif::Frames>,
 }
 
-impl Application for App {
-    type Executor = executor::Default;
-    type Message = Message;
-    type Theme = Theme;
-    type Flags = ();
-
-    fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
+impl App {
+    fn new() -> (Self, Task<Message>) {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/rust-lang-ferris.gif");
 
         (
@@ -48,41 +38,22 @@ impl Application for App {
         "Iced Gif".into()
     }
 
-    fn style(&self) -> theme::Application {
-        theme::Application::Custom(Box::new(Style))
-    }
-
-    fn update(&mut self, message: Message) -> Command<Message> {
+    fn update(&mut self, message: Message) -> Task<Message> {
         let Message::Loaded(frames) = message;
 
         self.frames = frames.ok();
 
-        Command::none()
+        Task::none()
     }
 
     fn view(&self) -> Element<Message> {
         if let Some(frames) = self.frames.as_ref() {
             container(gif(frames))
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .center_x()
-                .center_y()
+                .center_x(Length::Fill)
+                .center_y(Length::Fill)
                 .into()
         } else {
             row![].into()
-        }
-    }
-}
-
-pub struct Style;
-
-impl application::StyleSheet for Style {
-    type Style = Theme;
-
-    fn appearance(&self, style: &Self::Style) -> application::Appearance {
-        application::Appearance {
-            background_color: color!(0xFCFEFC),
-            text_color: style.palette().text,
         }
     }
 }
