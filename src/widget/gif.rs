@@ -23,17 +23,41 @@ use iced_futures::futures::{AsyncRead, AsyncReadExt};
 use tokio::io::{AsyncRead, AsyncReadExt};
 
 /// Error loading or decoding a gif
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Clone)]
 pub enum Error {
     /// Decode error
     #[error(transparent)]
-    Image(#[from] image_rs::ImageError),
+    Image(#[from] std::sync::Arc<image_rs::ImageError>),
     /// Load error
     #[error(transparent)]
-    Io(#[from] std::io::Error),
+    Io(#[from] std::sync::Arc<std::io::Error>),
+    #[cfg(feature = "tokio")]
+    /// Tokio join error
+    #[error(transparent)]
+    BlockingTask(#[from] std::sync::Arc<tokio::task::JoinError>),
+}
+
+impl std::convert::From<image_rs::ImageError> for Error {
+    fn from(value: image_rs::ImageError) -> Self {
+        Self::Image(std::sync::Arc::new(value))
+    }
+}
+
+impl std::convert::From<std::io::Error> for Error {
+    fn from(value: std::io::Error) -> Self {
+        Self::Io(std::sync::Arc::new(value))
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl std::convert::From<tokio::task::JoinError> for Error {
+    fn from(value: tokio::task::JoinError) -> Self {
+        Self::BlockingTask(std::sync::Arc::new(value))
+    }
 }
 
 /// The frames of a decoded gif
+#[derive(Clone)]
 pub struct Frames {
     first: Frame,
     frames: Vec<Frame>,
@@ -80,12 +104,43 @@ impl Frames {
 
         reader.read_to_end(&mut bytes).await?;
 
-        Self::from_bytes(bytes)
+        #[cfg(not(feature = "tokio"))]
+        return Self::from_bytes(bytes);
+
+        #[cfg(feature = "tokio")]
+        return Self::from_bytes(bytes).await;
     }
 
+    #[cfg(not(feature = "tokio"))]
     /// Decode [`Frames`] from the supplied bytes
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, Error> {
         let decoder = gif::GifDecoder::new(io::Cursor::new(bytes))?;
+
+        let total_bytes = decoder.total_bytes();
+
+        let frames = decoder
+            .into_frames()
+            .into_iter()
+            .map(|result| result.map(Frame::from))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let first = frames.first().cloned().unwrap();
+
+        Ok(Frames {
+            total_bytes,
+            first,
+            frames,
+        })
+    }
+
+    #[cfg(feature = "tokio")]
+    /// Decode [`Frames`] from the supplied bytes.
+    ///
+    /// Note: This function wraps the decoding step with [`tokio::task::spawn_blocking`].
+    pub async fn from_bytes(bytes: Vec<u8>) -> Result<Self, Error> {
+        let decoder =
+            tokio::task::spawn_blocking(move || gif::GifDecoder::new(io::Cursor::new(bytes)))
+                .await??;
 
         let total_bytes = decoder.total_bytes();
 
