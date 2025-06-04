@@ -10,7 +10,7 @@ use iced_widget::core::image::{self, FilterMethod, Handle};
 use iced_widget::core::mouse::Cursor;
 use iced_widget::core::widget::{tree, Tree};
 use iced_widget::core::{
-    event, layout, renderer, window, Clipboard, ContentFit, Element, Event, Layout, Length, Point,
+    layout, renderer, window, Clipboard, ContentFit, Element, Event, Layout, Length, Point,
     Rectangle, Rotation, Shell, Size, Vector, Widget,
 };
 use iced_widget::runtime::Task;
@@ -262,20 +262,21 @@ where
             self.height,
             self.content_fit,
             self.rotation,
+            false,
         )
     }
 
-    fn on_event(
+    fn update(
         &mut self,
         tree: &mut Tree,
-        event: Event,
+        event: &Event,
         _layout: Layout<'_>,
         _cursor: Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
-    ) -> event::Status {
+    ) {
         let state = tree.state.downcast_mut::<State>();
 
         if let Event::Window(window::Event::RedrawRequested(now)) = event {
@@ -286,15 +287,14 @@ where
 
                 state.current = self.frames.frames[state.index].clone().into();
 
-                shell.request_redraw(window::RedrawRequest::At(now + state.current.frame.delay));
+                shell
+                    .request_redraw_at(window::RedrawRequest::At(*now + state.current.frame.delay));
             } else {
                 let remaining = state.current.frame.delay - elapsed;
 
-                shell.request_redraw(window::RedrawRequest::At(now + remaining));
+                shell.request_redraw_at(window::RedrawRequest::At(*now + remaining));
             }
         }
-
-        event::Status::Ignored
     }
 
     fn draw(

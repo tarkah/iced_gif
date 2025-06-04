@@ -10,4 +10,5 @@ tokio = ["iced_gif/tokio", "iced/tokio"]
 
 [dependencies]
 iced_gif = { path = "../", default-features = false }
-iced = { version = "0.13", features = [ "image" ] }
+iced = { version = "0.14.0-dev", git = "https://github.com/iced-rs/iced.git", rev = "e867f44", features = ["advanced", "image"] }
+

@@ -4,14 +4,14 @@ use iced::widget::{container, row};
 use iced::{window, Element, Length, Size, Task};
 use iced_gif::widget::gif;
 
-fn main() {
-    iced::application(App::title, App::update, App::view)
+fn main() -> iced::Result {
+    iced::application(App::new, App::update, App::view)
+        .title(App::title)
         .window(window::Settings {
             size: Size::new(498.0, 164.0),
             ..Default::default()
         })
-        .run_with(App::new)
-        .unwrap()
+        .run()
 }
 
 #[derive(Debug)]

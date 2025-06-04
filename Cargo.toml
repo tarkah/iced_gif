@@ -1,6 +1,6 @@
 [package]
 name = "iced_gif"
-version = "0.13.0"
+version = "0.14.0-dev"
 edition = "2021"
 authors = ["tarkah <admin@tarkah.dev>"]
 description = "A GIF widget for Iced"
@@ -21,12 +21,12 @@ default = ["async-fs"]
 tokio = ["dep:tokio"]
 
 [dependencies]
-iced_widget = { version = "0.13",  features = ["image"] }
-iced_futures = "0.13.0"
-thiserror = "1.0"
+iced_widget = { version = "0.14.0-dev",  features = ["image"] }
+iced_futures = "0.14.0-dev"
+thiserror = "2.0"
 
 [dependencies.async-fs]
-version = "1.6"
+version = "2"
 optional = true
 
 [dependencies.tokio]
@@ -36,5 +36,9 @@ features = ["fs", "io-util"]
 
 [dependencies.image_rs]
 package = "image"
-version = "0.24"
+version = "0.25"
 features = ["gif"]
+
+[patch.crates-io]
+iced_widget = { git = "https://github.com/iced-rs/iced.git", rev = "e867f44" }
+iced_futures = { git = "https://github.com/iced-rs/iced.git", rev = "e867f44" }
