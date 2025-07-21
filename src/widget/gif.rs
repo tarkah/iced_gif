@@ -24,21 +24,11 @@ use iced_futures::futures::{AsyncRead, AsyncReadExt};
 #[cfg(feature = "tokio")]
 use tokio::io::{AsyncRead, AsyncReadExt};
 
-/// Error loading or decoding a gif
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Decode error
-    #[error(transparent)]
-    Image(#[from] image_rs::ImageError),
-    /// Load error
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[cfg(feature = "networking")]
-    #[error(transparent)]
-    Networking(#[from] reqwest::Error),
-}
+use crate::Error;
+
 
 /// The frames of a decoded gif
+#[derive(Clone)]
 pub struct Frames {
     first: Frame,
     frames: Vec<Frame>,
@@ -76,6 +66,7 @@ impl Frames {
     }
 
     #[cfg(feature = "networking")]
+    /// Load [`Frames`] from the supplied url 
     pub fn load_from_url(url: String) -> Task<Result<Frames, Error>> {
         #[cfg(not(feature = "tokio"))]
         use iced_futures::futures::io::BufReader;
@@ -127,7 +118,7 @@ impl Frames {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct Frame {
     delay: Duration,
     handle: image::Handle,

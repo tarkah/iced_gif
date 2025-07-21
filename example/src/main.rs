@@ -16,7 +16,7 @@ fn main() -> iced::Result {
 
 #[derive(Debug)]
 enum Message {
-    Loaded(Result<gif::Frames, gif::Error>),
+    Loaded(Result<gif::Frames, iced_gif::Error>),
 }
 
 #[derive(Default)]
