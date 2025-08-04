@@ -10,11 +10,13 @@ use iced_widget::core::image::{self, FilterMethod, Handle};
 use iced_widget::core::mouse::Cursor;
 use iced_widget::core::widget::{tree, Tree};
 use iced_widget::core::{
-    event, layout, renderer, window, Clipboard, ContentFit, Element, Event, Layout, Length, Point,
+    layout, renderer, window, Clipboard, ContentFit, Element, Event, Layout, Length, Point,
     Rectangle, Rotation, Shell, Size, Vector, Widget,
 };
 use iced_widget::runtime::Task;
 use image_rs::codecs::gif;
+#[cfg(feature = "networking")]
+use image_rs::EncodableLayout;
 use image_rs::{AnimationDecoder, ImageDecoder};
 
 #[cfg(not(feature = "tokio"))]
@@ -22,18 +24,11 @@ use iced_futures::futures::{AsyncRead, AsyncReadExt};
 #[cfg(feature = "tokio")]
 use tokio::io::{AsyncRead, AsyncReadExt};
 
-/// Error loading or decoding a gif
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Decode error
-    #[error(transparent)]
-    Image(#[from] image_rs::ImageError),
-    /// Load error
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-}
+use crate::Error;
+
 
 /// The frames of a decoded gif
+#[derive(Clone)]
 pub struct Frames {
     first: Frame,
     frames: Vec<Frame>,
@@ -70,6 +65,25 @@ impl Frames {
         Task::perform(f, std::convert::identity)
     }
 
+    #[cfg(feature = "networking")]
+    /// Load [`Frames`] from the supplied url 
+    pub fn load_from_url(url: String) -> Task<Result<Frames, Error>> {
+        #[cfg(not(feature = "tokio"))]
+        use iced_futures::futures::io::BufReader;
+        #[cfg(feature = "tokio")]
+        use tokio::io::BufReader;
+
+        let f = async move {
+            let response = reqwest::get(url).await?;
+            let content = response.bytes().await?;
+            let reader = BufReader::new(content.as_bytes());
+
+            Self::from_reader(reader).await
+        };
+
+        Task::perform(f, std::convert::identity)
+    }
+
     /// Decode [`Frames`] from the supplied async reader
     pub async fn from_reader<R: AsyncRead>(reader: R) -> Result<Self, Error> {
         use iced_futures::futures::pin_mut;
@@ -91,7 +105,6 @@ impl Frames {
 
         let frames = decoder
             .into_frames()
-            .into_iter()
             .map(|result| result.map(Frame::from))
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -105,7 +118,7 @@ impl Frames {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct Frame {
     delay: Duration,
     handle: image::Handle,
@@ -211,7 +224,7 @@ impl<'a> Gif<'a> {
     }
 }
 
-impl<'a, Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Gif<'a>
+impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer> for Gif<'_>
 where
     Renderer: image::Renderer<Handle = Handle>,
 {
@@ -262,20 +275,21 @@ where
             self.height,
             self.content_fit,
             self.rotation,
+            false,
         )
     }
 
-    fn on_event(
+    fn update(
         &mut self,
         tree: &mut Tree,
-        event: Event,
+        event: &Event,
         _layout: Layout<'_>,
         _cursor: Cursor,
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
-    ) -> event::Status {
+    ) {
         let state = tree.state.downcast_mut::<State>();
 
         if let Event::Window(window::Event::RedrawRequested(now)) = event {
@@ -286,15 +300,14 @@ where
 
                 state.current = self.frames.frames[state.index].clone().into();
 
-                shell.request_redraw(window::RedrawRequest::At(now + state.current.frame.delay));
+                shell
+                    .request_redraw_at(window::RedrawRequest::At(*now + state.current.frame.delay));
             } else {
                 let remaining = state.current.frame.delay - elapsed;
 
-                shell.request_redraw(window::RedrawRequest::At(now + remaining));
+                shell.request_redraw_at(window::RedrawRequest::At(*now + remaining));
             }
         }
-
-        event::Status::Ignored
     }
 
     fn draw(

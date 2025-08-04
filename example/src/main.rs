@@ -4,19 +4,19 @@ use iced::widget::{container, row};
 use iced::{window, Element, Length, Size, Task};
 use iced_gif::widget::gif;
 
-fn main() {
-    iced::application(App::title, App::update, App::view)
+fn main() -> iced::Result {
+    iced::application(App::new, App::update, App::view)
+        .title(App::title)
         .window(window::Settings {
             size: Size::new(498.0, 164.0),
             ..Default::default()
         })
-        .run_with(App::new)
-        .unwrap()
+        .run()
 }
 
 #[derive(Debug)]
 enum Message {
-    Loaded(Result<gif::Frames, gif::Error>),
+    Loaded(Result<gif::Frames, iced_gif::Error>),
 }
 
 #[derive(Default)]
@@ -31,6 +31,10 @@ impl App {
         (
             App::default(),
             gif::Frames::load_from_path(path).map(Message::Loaded),
+            // gif::Frames::load_from_url(
+            //     "https://media1.tenor.com/m/-HxZPr742BwAAAAC/meme-cat.gif".to_string(),
+            // )
+            // .map(Message::Loaded),
         )
     }
 
