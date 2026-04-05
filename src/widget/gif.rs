@@ -85,14 +85,16 @@ impl Frames {
     }
 
     /// Decode [`Frames`] from the supplied bytes
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, Error> {
+    pub fn from_bytes<T>(bytes: T) -> Result<Self, Error>
+    where
+        T: Send + Sync + std::convert::AsRef<[u8]>,
+    {
         let decoder = gif::GifDecoder::new(io::Cursor::new(bytes))?;
 
         let total_bytes = decoder.total_bytes();
 
         let frames = decoder
             .into_frames()
-            .into_iter()
             .map(|result| result.map(Frame::from))
             .collect::<Result<Vec<_>, _>>()?;
 
